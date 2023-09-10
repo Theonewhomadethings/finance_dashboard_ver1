@@ -1,0 +1,194 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+
+<style>
+    /* Box aesthetics */
+    .custom-header {
+        background-color: #f7f7f7;
+        padding: 10px 15px;
+        border-radius: 15px 15px 0 0;
+        border-bottom: 1px solid #ddd;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .custom-border {
+        border-radius: 0 0 15px 15px;
+        border: 1px solid #ddd;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        /* Ensure the top border is removed to merge with the header */
+        border-top: none;
+    }
+</style>
+
+<div class="text-center" style="margin-top: 100px;">
+    <h3>Welcome to the Finance Dashboard, {{request.user.username}}</h3>
+    <p></p>
+    <p>Here you can view your income and expenses.</p>
+    <p></p>
+    <div class="row mb-5">            
+        <!-- Middle Left: Dashboard Plot -->
+        <div class="col-md-6">
+            <div class="custom-header">Dashboard Plot</div>
+            <div class="custom-border" style="height: 450px;">
+                <canvas id="incomeExpenseChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Middle Right: Tabulated Data -->
+        <div class="col-md-6">
+            <div class="custom-header">Tabulated Data</div>
+            <div class="custom-border" style="height: 450px; overflow-y: scroll; overflow-x: scroll;">
+                <table id="transactionsTable" class="table table-striped">
+                    <!-- We'll populate this table using JavaScript -->
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add the Chart.js script tag -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // Parse the JSON data from the Django context
+        let incomes = JSON.parse('{{ incomes_json|escapejs }}');
+        let expenses = JSON.parse('{{ expenses_json|escapejs }}');
+
+        let incomeLabels = incomes.map(income => income.title);
+        let incomeData = incomes.map(income => parseFloat(income.total));  // Convert the total to float
+
+        let expenseLabels = expenses.map(expense => expense.category__name);
+        let expenseData = expenses.map(expense => parseFloat(expense.total));  // Convert the total to float
+
+        let ctx = document.getElementById('incomeExpenseChart').getContext('2d');
+
+        let gradientIncome = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientIncome.addColorStop(0, 'rgba(75, 192, 192, 0.5)');
+        gradientIncome.addColorStop(1, 'rgba(75, 192, 192, 1)');
+
+        let gradientExpense = ctx.createLinearGradient(0, 0, 0, 400);
+        gradientExpense.addColorStop(0, 'rgba(255, 99, 132, 0.5)');
+        gradientExpense.addColorStop(1, 'rgba(255, 99, 132, 1)');
+
+        let myChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: incomeLabels.concat(expenseLabels),
+                datasets: [{
+                    label: 'Income',
+                    data: incomeData,
+                    backgroundColor: gradientIncome,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 3
+                },
+                {
+                    label: 'Expense',
+                    data: expenseData,
+                    backgroundColor: gradientExpense,
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 3
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        min: -1500,
+                        max: 1500,
+                        stepSize: 250
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                },
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 15,
+                        right: 25,
+                        bottom: 15,
+                        left: 15
+                    }
+                },
+                elements: {
+                    bar: {
+                        borderWidth: 2,
+                        borderRadius: 5
+                    }
+                }
+            }
+        });
+
+       // The function to generate the table
+        function generateTable(transactions) {
+            let table = document.getElementById('transactionsTable');
+            
+            // Table header
+            let thead = document.createElement('thead');
+            let headerRow = document.createElement('tr');
+            ['Date', 'Title', 'Amount', 'Category', 'Type', 'Description'].forEach(headerText => {
+                let th = document.createElement('th');
+                th.textContent = headerText;
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // Table body
+            let tbody = document.createElement('tbody');
+            transactions.forEach(transaction => {
+                let tr = document.createElement('tr');
+                ['transaction_date', 'title', 'amount', 'category__name', 'type', 'description'].forEach(key => {
+                    let td = document.createElement('td');
+                    if (key === 'amount') {
+                        td.style.color = transaction.type === 'Income' ? 'green' : 'red';
+                    }
+                    td.textContent = transaction[key] || '';  // Using '||' to ensure if a field is undefined it defaults to an empty string
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+        }
+
+        // Merge the incomes and expenses arrays
+        let allTransactions = [
+            ...incomes.map(i => ({
+                transaction_date: i.transaction_date,
+                title: i.title,
+                type: 'Income',
+                amount: i.total,
+                category__name: i.category__name || '',
+                description: i.description || ''
+            })),
+            ...expenses.map(e => ({
+                transaction_date: e.transaction_date,
+                title: e.category__name,
+                type: 'Expense',
+                amount: e.total,
+                category__name: e.category__name || '',
+                description: e.description || ''
+            }))
+        ];
+
+        generateTable(allTransactions);
+
+    </script>
+
+</div>
+
+{% endblock %}

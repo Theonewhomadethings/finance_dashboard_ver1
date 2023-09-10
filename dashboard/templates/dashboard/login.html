@@ -1,0 +1,25 @@
+{% extends "dashboard/base.html" %}
+
+{% block content %}
+  <h2>Login</h2>
+  <form method="post">
+    {% csrf_token %}
+    
+    <label for="username">Username:</label>
+    <input type="text" name="username" required><br><br>
+
+    <label for="password">Password:</label>
+    <input type="password" name="password" required><br><br>
+
+    <button type="submit">Login</button>
+  </form>
+
+  <br>
+  <p>Don't have an account? <a href="{% url 'dashboard:register' %}">Register here</a>.</p>
+
+  {% if messages %}
+    {% for message in messages %}
+        <p>{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+{% endblock %}
